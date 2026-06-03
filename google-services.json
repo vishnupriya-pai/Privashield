@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1077337845085",
+    "project_id": "privashield-6f138",
+    "storage_bucket": "privashield-6f138.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1077337845085:android:4d4d079e710a74d1120cb4",
+        "android_client_info": {
+          "package_name": "com.vpriya.privashield"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1077337845085-rjlu5q5jlou94s8hmlc41csm3k2e7pqs.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAEmi7socQzfp75EI4a4lWQ3Ju0XpAQmKs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1077337845085-rjlu5q5jlou94s8hmlc41csm3k2e7pqs.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

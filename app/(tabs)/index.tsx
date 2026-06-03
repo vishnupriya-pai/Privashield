@@ -1,98 +1,249 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  Easing,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import Slider from '@react-native-community/slider';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { ShieldHero } from '@/components/ui/shield-hero';
 
-export default function HomeScreen() {
+type ShieldState = 'idle' | 'processing' | 'completed';
+
+export default function ShieldHubScreen() {
+  const [status, setStatus] = useState<ShieldState>('idle');
+  const [noiseIntensity, setNoiseIntensity] = useState(48);
+  const [hasSelection, setHasSelection] = useState(false);
+  const shimmer = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(shimmer, {
+        toValue: 1,
+        duration: 1800,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      }),
+    ).start();
+  }, [shimmer]);
+
+  const shimmerTranslate = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['-120%', '120%'],
+  });
+
+  const statusLabel = useMemo(() => {
+    if (status === 'processing') return 'Processing adversarial protection...';
+    if (status === 'completed') return 'Image secured successfully.';
+    return 'Upload an image and set noise level to begin.';
+  }, [status]);
+
+  const handleUploadPress = () => {
+    setHasSelection(true);
+    setStatus('idle');
+  };
+
+  const handleProtectPress = () => {
+    setStatus('processing');
+    setTimeout(() => {
+      setStatus('completed');
+    }, 1800);
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView style={styles.screen}>
+      <View style={styles.topSection}>
+        <Text style={styles.title}>Shield Hub</Text>
+        <Text style={styles.subtitle}>Adversarial protection for sensitive imagery.</Text>
+      </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <View style={styles.heroSection}>
+        <ShieldHero size={220} />
+        <View style={styles.heroLabel}>
+          <Text style={styles.heroLabelText}>Active protection field</Text>
+        </View>
+      </View>
+
+      <TouchableOpacity style={styles.uploadZone} onPress={handleUploadPress} activeOpacity={0.9}>
+        <Text style={styles.uploadTitle}>Tap to upload image</Text>
+        <Text style={styles.uploadHint}>{hasSelection ? 'Image ready for processing' : 'Select from gallery or camera'}</Text>
+        {hasSelection && <Animated.View style={[styles.shimmer, { transform: [{ translateX: shimmerTranslate }] }]} />}
+      </TouchableOpacity>
+
+      <View style={styles.sliderSection}>
+        <View style={styles.sliderHeader}>
+          <Text style={styles.sliderLabel}>Adversarial Noise Intensity</Text>
+          <Text style={styles.sliderValue}>{noiseIntensity}%</Text>
+        </View>
+        <Slider
+          style={styles.slider}
+          minimumValue={10}
+          maximumValue={100}
+          step={1}
+          value={noiseIntensity}
+          minimumTrackTintColor="#0EF6FF"
+          maximumTrackTintColor="#29303F"
+          thumbTintColor="#0EF6FF"
+          onValueChange={setNoiseIntensity}
+        />
+      </View>
+
+      <View style={styles.actionsRow}>
+        <TouchableOpacity
+          style={[styles.actionButton, hasSelection ? styles.actionButtonActive : styles.actionButtonDisabled]}
+          disabled={!hasSelection || status === 'processing'}
+          onPress={handleProtectPress}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.actionButtonText}>Protect Image</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.statusCard}>
+        <Text style={styles.statusTitle}>Status</Text>
+        <Text style={styles.statusText}>{statusLabel}</Text>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  screen: {
+    flex: 1,
+    backgroundColor: '#05060B',
+    padding: 20,
   },
-  stepContainer: {
+  topSection: {
     gap: 8,
+    marginBottom: 12,
+  },
+  title: {
+    color: '#FFFFFF',
+    fontSize: 30,
+    fontWeight: '800',
+  },
+  subtitle: {
+    color: '#9AA3B8',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  heroSection: {
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  heroLabel: {
+    marginTop: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(14,246,255,0.24)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  heroLabelText: {
+    color: '#0EF6FF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  uploadZone: {
+    marginVertical: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255,255,255,0.16)',
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    padding: 24,
+    overflow: 'hidden',
+  },
+  uploadTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  uploadHint: {
+    color: '#9AA3B8',
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  shimmer: {
     position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(14,246,255,0.12)',
+    opacity: 0.65,
+  },
+  sliderSection: {
+    marginTop: 22,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    borderRadius: 22,
+    backgroundColor: '#0E111C',
+    borderWidth: 1,
+    borderColor: 'rgba(14,246,255,0.1)',
+  },
+  sliderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sliderLabel: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  sliderValue: {
+    color: '#0EF6FF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  actionsRow: {
+    marginTop: 18,
+  },
+  actionButton: {
+    borderRadius: 18,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionButtonActive: {
+    backgroundColor: '#0EF6FF',
+  },
+  actionButtonDisabled: {
+    backgroundColor: 'rgba(14,246,255,0.18)',
+  },
+  actionButtonText: {
+    color: '#05060B',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  statusCard: {
+    marginTop: 20,
+    borderRadius: 20,
+    padding: 18,
+    backgroundColor: '#090B13',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+  },
+  statusTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  statusText: {
+    color: '#9AA3B8',
+    fontSize: 13,
+    lineHeight: 20,
   },
 });
