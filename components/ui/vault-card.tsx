@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export type VaultItem = {
   id: string;
@@ -8,6 +8,7 @@ export type VaultItem = {
   protectionLevel: string;
   noiseProfile: string;
   previewColor: string;
+  imageData?: string;
 };
 
 export function VaultCard({
@@ -19,7 +20,11 @@ export function VaultCard({
 }) {
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.85} onPress={onPress}>
-      <View style={[styles.preview, { backgroundColor: item.previewColor }]} />
+      {item.imageData ? (
+        <Image source={{ uri: item.imageData }} style={styles.preview} resizeMode="cover" />
+      ) : (
+        <View style={[styles.preview, { backgroundColor: item.previewColor }]} />
+      )}
       <View style={styles.info}>
         <Text style={styles.label}>{item.label}</Text>
         <Text style={styles.meta}>{item.protectionLevel}</Text>
@@ -44,6 +49,7 @@ const styles = StyleSheet.create({
     height: 120,
     borderBottomWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#1B263B',
   },
   info: {
     padding: 16,

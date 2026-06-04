@@ -1,46 +1,64 @@
-import React, { useMemo, useState } from 'react';
-import { FlatList, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { VaultCard, type VaultItem } from '@/components/ui/vault-card';
+import React, { useCallback, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useFocusEffect } from 'expo-router';
 
-const VAULT_HISTORY: VaultItem[] = [
-  {
-    id: '1',
-    label: 'Portrait 01',
-    timestamp: 'Today · 08:13 AM',
-    protectionLevel: 'High protection',
-    noiseProfile: 'Gaussian adversarial',
-    previewColor: '#142D3B',
-  },
-  {
-    id: '2',
-    label: 'Travel Shot',
-    timestamp: 'Yesterday · 03:42 PM',
-    protectionLevel: 'Medium protection',
-    noiseProfile: 'Edge perturbation',
-    previewColor: '#1B263B',
-  },
-  {
-    id: '3',
-    label: 'Conference',
-    timestamp: '2 days ago',
-    protectionLevel: 'Max protection',
-    noiseProfile: 'Frequency mask',
-    previewColor: '#1C2A3F',
-  },
-  {
-    id: '4',
-    label: 'ID Scan',
-    timestamp: '3 days ago',
-    protectionLevel: 'High protection',
-    noiseProfile: 'Gradient defense',
-    previewColor: '#10202F',
-  },
-];
+import { VaultCard } from '@/components/ui/vault-card';
+import { getVaultItems, removeVaultItem, type VaultItem } from '@/lib/vault-store';
 
 export default function VaultScreen() {
-  const [selectedItem, setSelectedItem] = useState<VaultItem | null>(VAULT_HISTORY[0]);
+  const [items, setItems] = useState<VaultItem[]>([]);
+  const [selected, setSelected] = useState<VaultItem | null>(null);
 
-  const storageSummary = useMemo(() => `${VAULT_HISTORY.length} encrypted items secured`, []);
+  useFocusEffect(
+    useCallback(() => {
+      getVaultItems().then((data) => {
+        setItems(data);
+        setSelected((prev) => (prev ? data.find((i) => i.id === prev.id) ?? null : null));
+      });
+    }, []),
+  );
+
+  const handleDelete = async (id: string) => {
+    Alert.alert('Remove', 'Remove this image from the vault?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          await removeVaultItem(id);
+          const updated = await getVaultItems();
+          setItems(updated);
+          if (selected?.id === id) setSelected(null);
+        },
+      },
+    ]);
+  };
+
+  const handleDownload = (item: VaultItem) => {
+    if (!item.imageData) return;
+    if (Platform.OS === 'web') {
+      const a = document.createElement('a');
+      a.href = item.imageData;
+      a.download = `privashield_${item.label.replace(/\s+/g, '_')}.png`;
+      a.click();
+    } else {
+      Alert.alert('Download', 'Open on web to download the image file.');
+    }
+  };
+
+  const storageSummary =
+    items.length === 0
+      ? 'Vault is empty — protect an image in Shield Hub'
+      : `${items.length} protected image${items.length !== 1 ? 's' : ''} secured`;
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -49,28 +67,49 @@ export default function VaultScreen() {
         <Text style={styles.subtitle}>{storageSummary}</Text>
       </View>
 
-      <FlatList
-        contentContainerStyle={styles.grid}
-        data={VAULT_HISTORY}
-        renderItem={({ item }) => (
-          <VaultCard item={item} onPress={() => setSelectedItem(item)} />
-        )}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        showsVerticalScrollIndicator={false}
-      />
+      {items.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>🔐</Text>
+          <Text style={styles.emptyText}>No protected images yet.</Text>
+          <Text style={styles.emptyHint}>Head to Shield Hub to generate your first one.</Text>
+        </View>
+      ) : (
+        <FlatList
+          contentContainerStyle={styles.grid}
+          data={items}
+          renderItem={({ item }) => (
+            <VaultCard item={item} onPress={() => setSelected(item)} />
+          )}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
-      {selectedItem ? (
+      {selected ? (
         <View style={styles.detailCard}>
           <View style={styles.detailLabelRow}>
-            <Text style={styles.detailTitle}>{selectedItem.label}</Text>
-            <Text style={styles.detailBadge}>{selectedItem.protectionLevel}</Text>
+            <Text style={styles.detailTitle}>{selected.label}</Text>
+            <Text style={styles.detailBadge}>{selected.protectionLevel}</Text>
           </View>
-          <Text style={styles.detailMeta}>Timestamp: {selectedItem.timestamp}</Text>
-          <Text style={styles.detailMeta}>Noise type: {selectedItem.noiseProfile}</Text>
-          <TouchableOpacity style={styles.detailButton} activeOpacity={0.85}>
-            <Text style={styles.detailButtonText}>Share / Download</Text>
-          </TouchableOpacity>
+          <Text style={styles.detailMeta}>Saved: {selected.timestamp}</Text>
+          <Text style={styles.detailMeta}>Noise: {selected.noiseProfile}</Text>
+          <View style={styles.detailActions}>
+            <TouchableOpacity
+              style={styles.detailButtonDownload}
+              activeOpacity={0.85}
+              onPress={() => handleDownload(selected)}
+            >
+              <Text style={styles.detailButtonTextDark}>Download ↓</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.detailButtonDelete}
+              activeOpacity={0.85}
+              onPress={() => handleDelete(selected.id)}
+            >
+              <Text style={styles.detailButtonTextLight}>Remove</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : null}
     </SafeAreaView>
@@ -99,6 +138,26 @@ const styles = StyleSheet.create({
   grid: {
     paddingVertical: 10,
   },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  emptyIcon: {
+    fontSize: 48,
+  },
+  emptyText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  emptyHint: {
+    color: '#9AA3B8',
+    fontSize: 13,
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
   detailCard: {
     marginTop: 12,
     borderRadius: 20,
@@ -126,17 +185,37 @@ const styles = StyleSheet.create({
   detailMeta: {
     color: '#9AA3B8',
     fontSize: 13,
-    marginTop: 8,
+    marginTop: 6,
   },
-  detailButton: {
+  detailActions: {
+    flexDirection: 'row',
+    gap: 10,
     marginTop: 18,
+  },
+  detailButtonDownload: {
+    flex: 1,
     backgroundColor: '#0EF6FF',
-    borderRadius: 16,
-    paddingVertical: 14,
+    borderRadius: 14,
+    paddingVertical: 13,
     alignItems: 'center',
   },
-  detailButtonText: {
+  detailButtonDelete: {
+    flex: 1,
+    backgroundColor: 'rgba(255,80,80,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,80,80,0.3)',
+    borderRadius: 14,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  detailButtonTextDark: {
     color: '#05060B',
     fontWeight: '700',
+    fontSize: 14,
+  },
+  detailButtonTextLight: {
+    color: '#FF6060',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

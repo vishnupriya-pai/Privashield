@@ -22,7 +22,7 @@ function getDevMachineHost(): string {
   return PHYSICAL_DEVICE_HOST;
 }
 
-const API_PORT = 8001;
+const API_PORT = 8000;
 
 export function getApiBaseUrl(): string {
   if (Platform.OS === 'web') {
