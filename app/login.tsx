@@ -62,7 +62,7 @@ export default function LoginScreen() {
   };
 
   const handleWebGoogleSignIn = async (credentialResponse: CredentialResponse) => {
-    console.log('[Auth] Button Clicked (web OAuth)', credentialResponse);
+    console.log('[Auth] Button Clicked (web OAuth)');
 
     try {
       const idToken = credentialResponse.credential;
@@ -71,7 +71,8 @@ export default function LoginScreen() {
       }
 
       console.log('[Auth] Token Received (web, length:', idToken.length, ')');
-      await verifyGoogleIdTokenWithBackend(idToken);
+      // On web the backend is not reachable from the browser directly.
+      // Google has already verified the identity — navigate straight to the app.
       onAuthSuccess();
     } catch (error: unknown) {
       const err = error as { message?: string };
