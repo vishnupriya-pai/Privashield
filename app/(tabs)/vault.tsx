@@ -36,9 +36,7 @@ export default function VaultScreen() {
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm('Remove this image from the vault?')) {
-        await doRemove();
-      }
+      await doRemove();
     } else {
       Alert.alert('Remove', 'Remove this image from the vault?', [
         { text: 'Cancel', style: 'cancel' },
