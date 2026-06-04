@@ -28,19 +28,23 @@ export default function VaultScreen() {
   );
 
   const handleDelete = async (id: string) => {
-    Alert.alert('Remove', 'Remove this image from the vault?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          await removeVaultItem(id);
-          const updated = await getVaultItems();
-          setItems(updated);
-          if (selected?.id === id) setSelected(null);
-        },
-      },
-    ]);
+    const doRemove = async () => {
+      await removeVaultItem(id);
+      const updated = await getVaultItems();
+      setItems(updated);
+      if (selected?.id === id) setSelected(null);
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Remove this image from the vault?')) {
+        await doRemove();
+      }
+    } else {
+      Alert.alert('Remove', 'Remove this image from the vault?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: doRemove },
+      ]);
+    }
   };
 
   const handleDownload = (item: VaultItem) => {
