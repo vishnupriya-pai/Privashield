@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 
-import { getApiBaseUrl } from '@/constants/api';
 import { addVaultItem } from '@/lib/vault-store';
 
 type ShieldState = 'idle' | 'processing' | 'completed' | 'error';
@@ -67,47 +66,83 @@ export default function ShieldHubScreen() {
     }
   };
 
+  const applyNoiseWeb = (uri: string, intensity: number): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('Canvas not supported'));
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX = 1200;
+        let w = img.width;
+        let h = img.height;
+        if (Math.max(w, h) > MAX) {
+          const r = MAX / Math.max(w, h);
+          w = Math.round(w * r);
+          h = Math.round(h * r);
+        }
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(img, 0, 0, w, h);
+        const eps = Math.max(1, (intensity / 100) * 32);
+        const id = ctx.getImageData(0, 0, w, h);
+        const d = id.data;
+        for (let i = 0; i < d.length; i += 4) {
+          for (let c = 0; c < 3; c++) {
+            const idx = i + c;
+            // FGSM-style: sign of finite-difference gradient
+            const right = idx + 4 < d.length ? d[idx + 4] - d[idx] : 0;
+            const down = idx + w * 4 < d.length ? d[idx + w * 4] - d[idx] : 0;
+            const fgsm = Math.sign(right + down) * eps * 0.5;
+            // Box-Muller Gaussian
+            const u1 = Math.random() || 1e-10;
+            const u2 = Math.random();
+            const gaussian = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2) * eps * 0.25;
+            // Structured frequency pattern
+            const x = (i / 4) % w;
+            const y = Math.floor(i / 4 / w);
+            const pattern = Math.sin(x * 0.4 + c) * Math.cos(y * 0.4 + c) * eps * 0.2;
+            d[idx] = Math.max(0, Math.min(255, d[idx] + fgsm + gaussian + pattern));
+          }
+        }
+        ctx.putImageData(id, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => reject(new Error('Failed to load image onto canvas'));
+      img.src = uri;
+    });
+
   const handleGenerate = async () => {
     if (!imageUri) return;
     setStatus('processing');
     setProtectedUri(null);
 
     try {
-      const formData = new FormData();
+      let result: string;
 
       if (Platform.OS === 'web') {
-        const res = await fetch(imageUri);
-        const blob = await res.blob();
-        formData.append('file', blob, 'image.jpg');
+        // Client-side processing — no backend needed
+        result = await applyNoiseWeb(imageUri, noiseIntensity);
       } else {
-        formData.append('file', {
-          uri: imageUri,
-          type: 'image/jpeg',
-          name: 'image.jpg',
-        } as any);
-      }
-      formData.append('intensity', String(noiseIntensity));
-
-      const apiRes = await fetch(`${getApiBaseUrl()}/api/protect`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!apiRes.ok) {
-        const text = await apiRes.text();
-        throw new Error(`Server error ${apiRes.status}: ${text}`);
+        // Native: send to FastAPI backend
+        const formData = new FormData();
+        formData.append('file', { uri: imageUri, type: 'image/jpeg', name: 'image.jpg' } as any);
+        formData.append('intensity', String(noiseIntensity));
+        const apiRes = await fetch('http://localhost:8000/api/protect', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!apiRes.ok) throw new Error(`Server error ${apiRes.status}`);
+        const data = await apiRes.json();
+        result = `data:image/png;base64,${data.image}`;
       }
 
-      const data = await apiRes.json();
-      setProtectedUri(`data:image/png;base64,${data.image}`);
+      setProtectedUri(result);
       setStatus('completed');
     } catch (err: any) {
       console.error('[Shield] protect error:', err);
       setStatus('error');
-      Alert.alert(
-        'Protection failed',
-        err.message ?? 'Could not reach the backend. Make sure it is running.',
-      );
+      Alert.alert('Protection failed', err.message ?? 'Something went wrong. Please try again.');
     }
   };
 
