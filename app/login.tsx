@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
 import {
   Alert,
-  Image,
   Platform,
   StyleSheet,
   Text,
@@ -14,13 +13,14 @@ import {
 
 import { GOOGLE_WEB_CLIENT_ID } from '@/constants/api';
 import { getGoogleIdTokenNative, verifyGoogleIdTokenWithBackend } from '@/lib/google-auth';
+import { decodeJwtPayload, useUser } from '@/lib/user-context';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { setUser } = useUser();
 
   useEffect(() => {
     if (Platform.OS !== 'web') {
-      console.log('[Auth] Configuring native Google Sign-In');
       GoogleSignin.configure({
         webClientId: GOOGLE_WEB_CLIENT_ID,
         offlineAccess: true,
@@ -28,55 +28,42 @@ export default function LoginScreen() {
     }
   }, []);
 
-  const onAuthSuccess = () => {
-    console.log('[Auth] Navigating to main app');
+  const onAuthSuccess = async (payload: Record<string, unknown>) => {
+    await setUser({
+      sub: String(payload.sub ?? payload.user_id ?? 'unknown'),
+      name: String(payload.name ?? payload.given_name ?? 'User'),
+      email: String(payload.email ?? ''),
+      picture: payload.picture ? String(payload.picture) : undefined,
+    });
     router.push('/home');
   };
 
   const handleGoogleSignIn = async () => {
-    console.log('[Auth] Button Clicked (native)');
-
     try {
       const idToken = await getGoogleIdTokenNative();
-      await verifyGoogleIdTokenWithBackend(idToken);
-      onAuthSuccess();
+      const result = await verifyGoogleIdTokenWithBackend(idToken);
+      const payload = result?.user ?? decodeJwtPayload(idToken);
+      await onAuthSuccess(payload as Record<string, unknown>);
     } catch (error: unknown) {
       const err = error as { code?: string; message?: string };
-      console.error('[Auth] Google sign-in error:', error);
-
-      if (err.code === statusCodes.SIGN_IN_CANCELLED) {
-        console.log('[Auth] User cancelled sign-in');
-        return;
-      }
-      if (err.code === statusCodes.IN_PROGRESS) {
-        console.log('[Auth] Sign-in already in progress');
-        return;
-      }
+      if (err.code === statusCodes.SIGN_IN_CANCELLED) return;
+      if (err.code === statusCodes.IN_PROGRESS) return;
       if (err.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        Alert.alert('Error', 'Google Play Services are not available or outdated.');
+        Alert.alert('Error', 'Google Play Services are not available.');
         return;
       }
-
       Alert.alert('Login Failed', err.message ?? 'An unknown error occurred.');
     }
   };
 
   const handleWebGoogleSignIn = async (credentialResponse: CredentialResponse) => {
-    console.log('[Auth] Button Clicked (web OAuth)');
-
     try {
       const idToken = credentialResponse.credential;
-      if (!idToken) {
-        throw new Error('No credential received from Google.');
-      }
-
-      console.log('[Auth] Token Received (web, length:', idToken.length, ')');
-      // On web the backend is not reachable from the browser directly.
-      // Google has already verified the identity — navigate straight to the app.
-      onAuthSuccess();
+      if (!idToken) throw new Error('No credential received from Google.');
+      const payload = decodeJwtPayload(idToken);
+      await onAuthSuccess(payload);
     } catch (error: unknown) {
       const err = error as { message?: string };
-      console.error('[Auth] Web Google sign-in error:', error);
       Alert.alert('Login Failed', err.message ?? 'An unknown error occurred.');
     }
   };
@@ -93,21 +80,13 @@ export default function LoginScreen() {
           <GoogleLogin
             clientId={GOOGLE_WEB_CLIENT_ID}
             onSuccess={handleWebGoogleSignIn}
-            onError={() => {
-              console.error('[Auth] GoogleLogin widget error');
-              Alert.alert('Login Failed', 'Google sign-in could not be started.');
-            }}
+            onError={() => Alert.alert('Login Failed', 'Google sign-in could not be started.')}
             useOneTap={false}
           />
         </View>
       ) : (
         <TouchableOpacity style={styles.googleButton} onPress={handleGoogleSignIn}>
-          <Image
-            source={{
-              uri: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg',
-            }}
-            style={styles.googleIcon}
-          />
+          <Text style={styles.googleIcon}>G</Text>
           <Text style={styles.buttonText}>Sign in with Google</Text>
         </TouchableOpacity>
       )}
@@ -162,8 +141,9 @@ const styles = StyleSheet.create({
     shadowRadius: 1.41,
   },
   googleIcon: {
-    width: 20,
-    height: 20,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1A73E8',
     marginRight: 12,
   },
   buttonText: {

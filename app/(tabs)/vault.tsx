@@ -13,24 +13,27 @@ import { useFocusEffect } from 'expo-router';
 
 import { VaultCard } from '@/components/ui/vault-card';
 import { getVaultItems, removeVaultItem, type VaultItem } from '@/lib/vault-store';
+import { useUser } from '@/lib/user-context';
 
 export default function VaultScreen() {
+  const { user } = useUser();
+  const userId = user?.sub ?? 'guest';
   const [items, setItems] = useState<VaultItem[]>([]);
   const [selected, setSelected] = useState<VaultItem | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-      getVaultItems().then((data) => {
+      getVaultItems(userId).then((data) => {
         setItems(data);
         setSelected((prev) => (prev ? data.find((i) => i.id === prev.id) ?? null : null));
       });
-    }, []),
+    }, [userId]),
   );
 
   const handleDelete = async (id: string) => {
     const doRemove = async () => {
-      await removeVaultItem(id);
-      const updated = await getVaultItems();
+      await removeVaultItem(id, userId);
+      const updated = await getVaultItems(userId);
       setItems(updated);
       if (selected?.id === id) setSelected(null);
     };

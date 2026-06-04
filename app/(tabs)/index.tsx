@@ -16,6 +16,7 @@ import {
 import Slider from '@react-native-community/slider';
 
 import { addVaultItem } from '@/lib/vault-store';
+import { useUser } from '@/lib/user-context';
 
 type ShieldState = 'idle' | 'processing' | 'completed' | 'error';
 
@@ -26,6 +27,8 @@ function randomId() {
 }
 
 export default function ShieldHubScreen() {
+  const { user } = useUser();
+  const userId = user?.sub ?? 'guest';
   const [status, setStatus] = useState<ShieldState>('idle');
   const [noiseIntensity, setNoiseIntensity] = useState(48);
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -192,7 +195,7 @@ export default function ShieldHubScreen() {
       noiseProfile: 'Gradient defense',
       previewColor: PREVIEW_COLORS[Math.floor(Math.random() * PREVIEW_COLORS.length)],
       imageData: protectedUri,
-    });
+    }, userId);
     Alert.alert('Saved ✓', 'Protected image saved to Secure Vault.');
   };
 

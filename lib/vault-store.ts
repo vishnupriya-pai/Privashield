@@ -1,9 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-const VAULT_KEY = '@privashield_vault';
-const VAULT_KEY_STORE = '@privashield_vk';
-
 export interface VaultItem {
   id: string;
   label: string;
@@ -14,29 +11,40 @@ export interface VaultItem {
   imageData?: string;
 }
 
-// ── AES-GCM encryption (web only, uses built-in Web Crypto API) ───────────────
+// ── Key helpers (namespaced per user) ─────────────────────────────────────────
 
-const CRYPTO_ALGO = { name: 'AES-GCM', length: 256 } as const;
+function vaultStorageKey(userId: string) {
+  return `@privashield_vault_${userId}`;
+}
+function vaultEncryptionKey(userId: string) {
+  return `@privashield_vk_${userId}`;
+}
 
-async function getOrCreateKey(): Promise<CryptoKey> {
-  const stored = localStorage.getItem(VAULT_KEY_STORE);
+// ── AES-GCM encryption (web, built-in Web Crypto API) ────────────────────────
+
+const ALGO = { name: 'AES-GCM', length: 256 } as const;
+
+async function getOrCreateKey(userId: string): Promise<CryptoKey> {
+  const storeKey = vaultEncryptionKey(userId);
+  const stored = localStorage.getItem(storeKey);
   if (stored) {
     try {
       const jwk: JsonWebKey = JSON.parse(stored);
-      return crypto.subtle.importKey('jwk', jwk, CRYPTO_ALGO, false, ['encrypt', 'decrypt']);
+      return crypto.subtle.importKey('jwk', jwk, ALGO, false, ['encrypt', 'decrypt']);
     } catch {
-      localStorage.removeItem(VAULT_KEY_STORE);
+      localStorage.removeItem(storeKey);
     }
   }
-  const key = await crypto.subtle.generateKey(CRYPTO_ALGO, true, ['encrypt', 'decrypt']);
+  const key = await crypto.subtle.generateKey(ALGO, true, ['encrypt', 'decrypt']);
   const jwk = await crypto.subtle.exportKey('jwk', key);
-  localStorage.setItem(VAULT_KEY_STORE, JSON.stringify(jwk));
+  localStorage.setItem(storeKey, JSON.stringify(jwk));
   return key;
 }
 
 function b64ToBytes(b64: string): Uint8Array {
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 }
+
 function bytesToB64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
   let binary = '';
@@ -47,8 +55,8 @@ function bytesToB64(buf: ArrayBuffer): string {
   return btoa(binary);
 }
 
-async function encryptField(plain: string): Promise<string> {
-  const key = await getOrCreateKey();
+async function encryptField(plain: string, userId: string): Promise<string> {
+  const key = await getOrCreateKey(userId);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
@@ -58,10 +66,10 @@ async function encryptField(plain: string): Promise<string> {
   return JSON.stringify({ iv: bytesToB64(iv), ct: bytesToB64(ciphertext) });
 }
 
-async function decryptField(encrypted: string): Promise<string | undefined> {
+async function decryptField(encrypted: string, userId: string): Promise<string | undefined> {
   try {
     const { iv: ivB64, ct: ctB64 } = JSON.parse(encrypted) as { iv: string; ct: string };
-    const key = await getOrCreateKey();
+    const key = await getOrCreateKey(userId);
     const plain = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: b64ToBytes(ivB64) },
       key,
@@ -77,46 +85,46 @@ function isEncrypted(value: string): boolean {
   return value.startsWith('{"iv":');
 }
 
-async function encryptItem(item: VaultItem): Promise<VaultItem> {
+async function encryptItem(item: VaultItem, userId: string): Promise<VaultItem> {
   if (Platform.OS !== 'web' || !item.imageData) return item;
-  return { ...item, imageData: await encryptField(item.imageData) };
+  return { ...item, imageData: await encryptField(item.imageData, userId) };
 }
 
-async function decryptItem(item: VaultItem): Promise<VaultItem> {
+async function decryptItem(item: VaultItem, userId: string): Promise<VaultItem> {
   if (Platform.OS !== 'web' || !item.imageData || !isEncrypted(item.imageData)) return item;
-  const decrypted = await decryptField(item.imageData);
+  const decrypted = await decryptField(item.imageData, userId);
   return { ...item, imageData: decrypted };
 }
 
-// ── Public API ─────────────────────────────────────────────────────────────────
+// ── Public API (all functions require userId) ─────────────────────────────────
 
-export async function getVaultItems(): Promise<VaultItem[]> {
+export async function getVaultItems(userId: string): Promise<VaultItem[]> {
   try {
-    const json = await AsyncStorage.getItem(VAULT_KEY);
+    const json = await AsyncStorage.getItem(vaultStorageKey(userId));
     if (!json) return [];
     const raw: VaultItem[] = JSON.parse(json);
-    return Promise.all(raw.map(decryptItem));
+    return Promise.all(raw.map((item) => decryptItem(item, userId)));
   } catch {
     return [];
   }
 }
 
-export async function addVaultItem(item: VaultItem): Promise<void> {
-  const raw = await getRawVaultItems();
-  const encrypted = await encryptItem(item);
+export async function addVaultItem(item: VaultItem, userId: string): Promise<void> {
+  const raw = await getRawItems(userId);
+  const encrypted = await encryptItem(item, userId);
   raw.unshift(encrypted);
-  await AsyncStorage.setItem(VAULT_KEY, JSON.stringify(raw));
+  await AsyncStorage.setItem(vaultStorageKey(userId), JSON.stringify(raw));
 }
 
-export async function removeVaultItem(id: string): Promise<void> {
-  const raw = await getRawVaultItems();
+export async function removeVaultItem(id: string, userId: string): Promise<void> {
+  const raw = await getRawItems(userId);
   const filtered = raw.filter((i) => i.id !== id);
-  await AsyncStorage.setItem(VAULT_KEY, JSON.stringify(filtered));
+  await AsyncStorage.setItem(vaultStorageKey(userId), JSON.stringify(filtered));
 }
 
-async function getRawVaultItems(): Promise<VaultItem[]> {
+async function getRawItems(userId: string): Promise<VaultItem[]> {
   try {
-    const json = await AsyncStorage.getItem(VAULT_KEY);
+    const json = await AsyncStorage.getItem(vaultStorageKey(userId));
     return json ? JSON.parse(json) : [];
   } catch {
     return [];
