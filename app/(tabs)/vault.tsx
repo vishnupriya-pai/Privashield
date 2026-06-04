@@ -2,8 +2,10 @@ import React, { useCallback, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Image,
   Platform,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -67,160 +69,134 @@ export default function VaultScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <View style={styles.headerSection}>
-        <Text style={styles.title}>Secure Vault</Text>
-        <Text style={styles.subtitle}>{storageSummary}</Text>
-      </View>
-
-      {items.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🔐</Text>
-          <Text style={styles.emptyText}>No protected images yet.</Text>
-          <Text style={styles.emptyHint}>Head to Shield Hub to generate your first one.</Text>
-        </View>
-      ) : (
-        <FlatList
-          contentContainerStyle={styles.grid}
-          data={items}
-          renderItem={({ item }) => (
-            <VaultCard item={item} onPress={() => setSelected(item)} />
-          )}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-
       {selected ? (
-        <View style={styles.detailCard}>
-          <View style={styles.detailLabelRow}>
-            <Text style={styles.detailTitle}>{selected.label}</Text>
+        /* ── Full detail view ── */
+        <ScrollView contentContainerStyle={styles.detailScroll} showsVerticalScrollIndicator={false}>
+          <View style={styles.detailHeader}>
+            <TouchableOpacity onPress={() => setSelected(null)} style={styles.backBtn}>
+              <Text style={styles.backText}>← Back</Text>
+            </TouchableOpacity>
             <Text style={styles.detailBadge}>{selected.protectionLevel}</Text>
           </View>
-          <Text style={styles.detailMeta}>Saved: {selected.timestamp}</Text>
-          <Text style={styles.detailMeta}>Noise: {selected.noiseProfile}</Text>
+
+          {selected.imageData ? (
+            <Image
+              source={{ uri: selected.imageData }}
+              style={styles.detailImage}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={[styles.detailImage, { backgroundColor: selected.previewColor, alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ color: '#9AA3B8', fontSize: 13 }}>Image not available</Text>
+            </View>
+          )}
+
+          <View style={styles.detailMeta}>
+            <Text style={styles.detailTitle}>{selected.label}</Text>
+            <Text style={styles.detailSub}>Saved: {selected.timestamp}</Text>
+            <Text style={styles.detailSub}>Noise profile: {selected.noiseProfile}</Text>
+          </View>
+
           <View style={styles.detailActions}>
             <TouchableOpacity
-              style={styles.detailButtonDownload}
+              style={styles.btnDownload}
               activeOpacity={0.85}
               onPress={() => handleDownload(selected)}
             >
-              <Text style={styles.detailButtonTextDark}>Download ↓</Text>
+              <Text style={styles.btnDownloadText}>Download ↓</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.detailButtonDelete}
+              style={styles.btnDelete}
               activeOpacity={0.85}
               onPress={() => handleDelete(selected.id)}
             >
-              <Text style={styles.detailButtonTextLight}>Remove</Text>
+              <Text style={styles.btnDeleteText}>Remove</Text>
             </TouchableOpacity>
           </View>
-        </View>
-      ) : null}
+        </ScrollView>
+      ) : (
+        /* ── Grid view ── */
+        <>
+          <View style={styles.headerSection}>
+            <Text style={styles.title}>Secure Vault</Text>
+            <Text style={styles.subtitle}>{storageSummary}</Text>
+          </View>
+
+          {items.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>🔐</Text>
+              <Text style={styles.emptyText}>No protected images yet.</Text>
+              <Text style={styles.emptyHint}>Head to Shield Hub to generate your first one.</Text>
+            </View>
+          ) : (
+            <FlatList
+              contentContainerStyle={styles.grid}
+              data={items}
+              renderItem={({ item }) => (
+                <VaultCard item={item} onPress={() => setSelected(item)} />
+              )}
+              keyExtractor={(item) => item.id}
+              numColumns={2}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#05060B',
-    padding: 20,
-  },
-  headerSection: {
-    marginBottom: 18,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '800',
-  },
-  subtitle: {
-    marginTop: 6,
-    color: '#9AA3B8',
-    fontSize: 14,
-  },
-  grid: {
-    paddingVertical: 10,
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  emptyIcon: {
-    fontSize: 48,
-  },
-  emptyText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  emptyHint: {
-    color: '#9AA3B8',
-    fontSize: 13,
-    textAlign: 'center',
-    paddingHorizontal: 32,
-  },
-  detailCard: {
-    marginTop: 12,
-    borderRadius: 20,
-    backgroundColor: '#0E111C',
-    padding: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(14,246,255,0.1)',
-  },
-  detailLabelRow: {
+  screen: { flex: 1, backgroundColor: '#05060B', padding: 20 },
+
+  /* Grid */
+  headerSection: { marginBottom: 18 },
+  title: { color: '#FFFFFF', fontSize: 28, fontWeight: '800' },
+  subtitle: { marginTop: 6, color: '#9AA3B8', fontSize: 14 },
+  grid: { paddingVertical: 10 },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  emptyIcon: { fontSize: 48 },
+  emptyText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  emptyHint: { color: '#9AA3B8', fontSize: 13, textAlign: 'center', paddingHorizontal: 32 },
+
+  /* Detail view */
+  detailScroll: { paddingBottom: 40 },
+  detailHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 16,
   },
-  detailTitle: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '800',
+  backBtn: { padding: 4 },
+  backText: { color: '#0EF6FF', fontSize: 15, fontWeight: '600' },
+  detailBadge: { color: '#0EF6FF', fontSize: 12, fontWeight: '700' },
+  detailImage: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 20,
+    backgroundColor: '#111218',
+    marginBottom: 20,
   },
-  detailBadge: {
-    color: '#0EF6FF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  detailMeta: {
-    color: '#9AA3B8',
-    fontSize: 13,
-    marginTop: 6,
-  },
-  detailActions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 18,
-  },
-  detailButtonDownload: {
+  detailMeta: { gap: 6, marginBottom: 24 },
+  detailTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
+  detailSub: { color: '#9AA3B8', fontSize: 13 },
+  detailActions: { flexDirection: 'row', gap: 12 },
+  btnDownload: {
     flex: 1,
     backgroundColor: '#0EF6FF',
-    borderRadius: 14,
-    paddingVertical: 13,
+    borderRadius: 16,
+    paddingVertical: 15,
     alignItems: 'center',
   },
-  detailButtonDelete: {
+  btnDownloadText: { color: '#05060B', fontWeight: '700', fontSize: 15 },
+  btnDelete: {
     flex: 1,
-    backgroundColor: 'rgba(255,80,80,0.12)',
+    backgroundColor: 'rgba(255,80,80,0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255,80,80,0.3)',
-    borderRadius: 14,
-    paddingVertical: 13,
+    borderRadius: 16,
+    paddingVertical: 15,
     alignItems: 'center',
   },
-  detailButtonTextDark: {
-    color: '#05060B',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  detailButtonTextLight: {
-    color: '#FF6060',
-    fontWeight: '700',
-    fontSize: 14,
-  },
+  btnDeleteText: { color: '#FF6060', fontWeight: '700', fontSize: 15 },
 });

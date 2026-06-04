@@ -132,6 +132,19 @@ function imgKey(userId: string, itemId: string) {
 
 export async function getVaultItems(userId: string): Promise<VaultItem[]> {
   try {
+    // ── Migrate old items saved under the legacy key format ──────────────────
+    const legacyKey = `@privashield_vault_${userId}`;
+    const legacyJson = await AsyncStorage.getItem(legacyKey);
+    if (legacyJson) {
+      const legacyItems: VaultItem[] = JSON.parse(legacyJson);
+      // Re-save each old item through the new architecture, then clear the old key
+      for (const item of legacyItems) {
+        await addVaultItem(item, userId);
+      }
+      await AsyncStorage.removeItem(legacyKey);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const json = await AsyncStorage.getItem(metaKey(userId));
     const metas: VaultItem[] = json ? JSON.parse(json) : [];
 
