@@ -48,6 +48,29 @@ export default function ShieldHubScreen() {
     outputRange: ['-120%', '120%'],
   });
 
+  const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+  const ALLOWED_MIME_PREFIXES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+  const validateImageUri = async (uri: string): Promise<boolean> => {
+    if (Platform.OS !== 'web') return true; // native picker already restricts to images
+    try {
+      const res = await fetch(uri);
+      const blob = await res.blob();
+      if (!ALLOWED_MIME_PREFIXES.some((m) => blob.type.startsWith(m))) {
+        Alert.alert('Invalid file', 'Only JPEG, PNG, GIF, and WebP images are supported.');
+        return false;
+      }
+      if (blob.size > MAX_FILE_BYTES) {
+        Alert.alert('File too large', 'Please choose an image under 10 MB.');
+        return false;
+      }
+    } catch {
+      Alert.alert('Error', 'Could not read the selected file.');
+      return false;
+    }
+    return true;
+  };
+
   const handleUploadPress = async () => {
     const { status: permStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permStatus !== 'granted') {
@@ -60,7 +83,9 @@ export default function ShieldHubScreen() {
       quality: 1,
     });
     if (!result.canceled && result.assets.length > 0) {
-      setImageUri(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      if (!(await validateImageUri(uri))) return;
+      setImageUri(uri);
       setProtectedUri(null);
       setStatus('idle');
     }
