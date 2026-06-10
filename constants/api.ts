@@ -26,7 +26,9 @@ const API_PORT = 8000;
 
 export function getApiBaseUrl(): string {
   if (Platform.OS === 'web') {
-    return `http://localhost:${API_PORT}`;
+    // On web the proxy-server forwards /api/* to the FastAPI backend,
+    // so relative paths work from any browser (local or remote).
+    return '';
   }
   if (Platform.OS === 'android') {
     const host = getDevMachineHost();
