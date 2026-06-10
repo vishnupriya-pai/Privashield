@@ -1,0 +1,29 @@
+Create a feature for the "Secure Vault" tab in my PrivaShield app that compares an original image against a noise-protected (privacy-enhanced) version to analyze the protection quality.
+
+Use Python, OpenCV, Streamlit (or standard HTML/JS if using a web view, but prefer Streamlit for rapid Python UI), and scikit-image for metrics.
+
+### 1. Backend Processing Logic
+Write a Python script using OpenCV that does the following:
+- Accepts an Original Image and a Noise-Protected Image.
+- Resizes the noise-protected image to match the original if dimensions differ slightly.
+- Computes the following quality metrics:
+  * Mean Squared Error (MSE)
+  * Peak Signal-to-Noise Ratio (PSNR)
+  * Structural Similarity Index (SSIM) using `skimage.metrics.structural_similarity` (ensure `full=True` to get the diff map).
+- Generates the following visual outputs:
+  1. Amplified Diff Map: Take the absolute difference, multiply by a factor (e.g., 5x or 10x) to make subtle noise visible, and convert to grayscale.
+  2. SSIM Heatmap: Convert the SSIM diff map into a visual heatmap using OpenCV's `cv2.applyColorMap` with the `cv2.COLORMAP_JET` colormap.
+  3. Contour Overlay: Threshold the difference map to find changed pixels, find contours using `cv2.findContours`, and draw red contour outlines over a copy of the original image.
+- Saves all processed images to a temporary output directory.
+- Creates a single, horizontal "Side-by-Side Comparison Strip" containing: Original | Noise-Protected | Amplified Diff | SSIM Heatmap | Contour Overlay.
+
+### 2. Frontend & UI Design (Secure Vault Style)
+Build a dark-themed, sleek user interface appropriate for a privacy app like PrivaShield:
+- Layout: A two-column file uploader for the Original and Noise-Protected images.
+- Action Button: A prominent "Analyze Privacy Protection" button.
+- Metrics Dashboard: Display MSE, PSNR, and SSIM inside clean, bordered metric cards. Add brief tooltips explaining what they mean (e.g., "Lower SSIM means stronger privacy masking").
+- Visuals Section: 
+  * Display the comprehensive "Comparison Strip" at the top of the results.
+  * Below it, create an expandable gallery or tabs to view each generated map (Amplified Diff, Jet Heatmap, Contour Overlay) in high resolution with individual download buttons.
+
+Please write clean, modular code, handle potential image loading errors gracefully, and ensure all library dependencies (opencv-python-headless, scikit-image, numpy) are included.
